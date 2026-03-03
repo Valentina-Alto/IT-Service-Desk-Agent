@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Service Desk</title>
+    <style>
+        /* --- Reset & Base --- */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #f0f2f5;
+            --surface: #ffffff;
+            --primary: #0078d4;
+            --primary-dark: #005a9e;
+            --text: #1a1a1a;
+            --text-muted: #6b7280;
+            --border: #e5e7eb;
+            --step-bg: #f8f9fb;
+            --step-border: #e0e4ea;
+            --user-bg: #0078d4;
+            --user-text: #ffffff;
+            --agent-bg: #ffffff;
+            --code-bg: #1e1e1e;
+            --code-text: #d4d4d4;
+            --shadow: 0 1px 3px rgba(0,0,0,0.08);
+            --shadow-lg: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- Header --- */
+        .header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: var(--shadow);
+            z-index: 10;
+        }
+
+        .header-icon {
+            width: 40px; height: 40px;
+            background: var(--primary);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px;
+            color: white;
+        }
+
+        .header-text h1 {
+            font-size: 18px; font-weight: 600; color: var(--text);
+        }
+
+        .header-text p {
+            font-size: 12px; color: var(--text-muted); margin-top: 1px;
+        }
+
+        .header-actions {
+            margin-left: auto;
+        }
+
+        .btn-reset {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 13px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn-reset:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        /* --- Chat Area --- */
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .welcome {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .welcome h2 {
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .welcome p {
+            font-size: 14px;
+            max-width: 400px;
+            margin: 0 auto 24px;
+            line-height: 1.5;
+        }
+
+        .suggestions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .suggestion {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 8px 16px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.15s;
+            color: var(--text);
+        }
+
+        .suggestion:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            box-shadow: var(--shadow);
+        }
+
+        /* --- Messages --- */
+        .message {
+            display: flex;
+            gap: 10px;
+            max-width: 780px;
+            width: 100%;
+            margin: 0 auto;
+            animation: fadeIn 0.25s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user { flex-direction: row-reverse; }
+
+        .avatar {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .avatar.user-avatar { background: var(--primary); color: white; }
+        .avatar.agent-avatar { background: #e8eaed; color: #444; }
+
+        .bubble {
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-size: 14px;
+            line-height: 1.6;
+            max-width: 600px;
+            word-wrap: break-word;
+        }
+
+        .message.user .bubble {
+            background: var(--user-bg);
+            color: var(--user-text);
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.agent .bubble {
+            background: var(--agent-bg);
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 4px;
+            box-shadow: var(--shadow);
+        }
+
+        .bubble code {
+            background: var(--code-bg);
+            color: var(--code-text);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+        }
+
+        .bubble pre {
+            background: var(--code-bg);
+            color: var(--code-text);
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 8px 0;
+            font-size: 13px;
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+            line-height: 1.4;
+        }
+
+        .bubble pre code {
+            background: none;
+            padding: 0;
+        }
+
+        /* --- Steps / Activity --- */
+        .steps-container {
+            max-width: 780px;
+            width: 100%;
+            margin: 0 auto;
+            animation: fadeIn 0.25s ease;
+        }
+
+        .step {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 14px;
+            background: var(--step-bg);
+            border: 1px solid var(--step-border);
+            border-radius: 10px;
+            margin-bottom: 6px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .step-icon {
+            flex-shrink: 0;
+            width: 22px; height: 22px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px;
+        }
+
+        .step-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .step-label {
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 2px;
+        }
+
+        .step-detail {
+            font-size: 12px;
+            color: var(--text-muted);
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        .step.thinking .step-icon { animation: pulse 1.2s infinite; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .step.calling { border-left: 3px solid #f59e0b; }
+        .step.completed { border-left: 3px solid #10b981; }
+
+        /* --- Input Area --- */
+        .input-area {
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            padding: 16px 24px;
+            z-index: 10;
+        }
+
+        .input-row {
+            max-width: 780px;
+            margin: 0 auto;
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            position: relative;
+        }
+
+        #messageInput {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: none;
+            outline: none;
+            max-height: 120px;
+            transition: border-color 0.15s;
+            line-height: 1.5;
+        }
+
+        #messageInput:focus {
+            border-color: var(--primary);
+        }
+
+        #messageInput::placeholder { color: #b0b5bd; }
+
+        .btn-send {
+            width: 44px; height: 44px;
+            border: none;
+            border-radius: 12px;
+            background: var(--primary);
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.15s;
+            flex-shrink: 0;
+        }
+
+        .btn-send:hover { background: var(--primary-dark); }
+        .btn-send:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .footer-note {
+            text-align: center;
+            font-size: 11px;
+            color: #b0b5bd;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-icon">🔧</div>
+        <div class="header-text">
+            <h1>AI Service Desk</h1>
+            <p>Powered by MCP &amp; Microsoft Agent Framework</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn-reset" onclick="resetChat()">New Chat</button>
+        </div>
+    </div>
+
+    <!-- Chat Area -->
+    <div class="chat-container" id="chatContainer">
+        <div class="welcome" id="welcome">
+            <h2>👋 How can I help?</h2>
+            <p>I'm your AI service desk agent. I can diagnose system issues by running PowerShell commands on your machine.</p>
+            <div class="suggestions">
+                <div class="suggestion" onclick="sendSuggestion(this)">Check my CPU usage</div>
+                <div class="suggestion" onclick="sendSuggestion(this)">Why is my laptop slow?</div>
+                <div class="suggestion" onclick="sendSuggestion(this)">Show disk space</div>
+                <div class="suggestion" onclick="sendSuggestion(this)">List recent errors</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Input Area -->
+    <div class="input-area">
+        <div class="input-row">
+            <div class="input-wrapper">
+                <textarea id="messageInput" rows="1" placeholder="Describe your issue..."
+                    onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+            </div>
+            <button class="btn-send" id="sendBtn" onclick="sendMessage()">➤</button>
+        </div>
+        <div class="footer-note">AI diagnostics run read-only PowerShell commands on your system</div>
+    </div>
+
+    <script>
+        let sessionId = crypto.randomUUID();
+        let isStreaming = false;
+
+        const chatContainer = document.getElementById('chatContainer');
+        const messageInput  = document.getElementById('messageInput');
+        const sendBtn       = document.getElementById('sendBtn');
+        const welcome       = document.getElementById('welcome');
+
+        // --- Auto-resize textarea ---
+        function autoResize(el) {
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+        }
+
+        function handleKey(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        }
+
+        // --- Suggestion chips ---
+        function sendSuggestion(el) {
+            messageInput.value = el.textContent;
+            sendMessage();
+        }
+
+        // --- Add a message bubble ---
+        function addMessage(role, html) {
+            if (welcome) welcome.style.display = 'none';
+            const avatarClass = role === 'user' ? 'user-avatar' : 'agent-avatar';
+            const avatarText  = role === 'user' ? '👤' : '🤖';
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+            div.innerHTML = `
+                <div class="avatar ${avatarClass}">${avatarText}</div>
+                <div class="bubble">${html}</div>`;
+            chatContainer.appendChild(div);
+            scrollDown();
+            return div;
+        }
+
+        // --- Step indicators ---
+        let stepsDiv = null;
+
+        function ensureStepsContainer() {
+            if (!stepsDiv) {
+                stepsDiv = document.createElement('div');
+                stepsDiv.className = 'steps-container';
+                chatContainer.appendChild(stepsDiv);
+            }
+            return stepsDiv;
+        }
+
+        function addStep(type, data) {
+            const container = ensureStepsContainer();
+
+            if (type === 'thinking') {
+                container.innerHTML += `
+                    <div class="step thinking" id="thinkingStep">
+                        <div class="step-icon">⏳</div>
+                        <div class="step-content">
+                            <div class="step-label">Thinking...</div>
+                        </div>
+                    </div>`;
+            } else if (type === 'calling') {
+                // Remove thinking indicator
+                const ts = document.getElementById('thinkingStep');
+                if (ts) ts.remove();
+                container.innerHTML += `
+                    <div class="step calling">
+                        <div class="step-icon">🔧</div>
+                        <div class="step-content">
+                            <div class="step-label">Calling tool: ${escapeHtml(data.tool)}</div>
+                            ${data.args ? `<div class="step-detail">${escapeHtml(data.args)}</div>` : ''}
+                        </div>
+                    </div>`;
+            } else if (type === 'completed') {
+                container.innerHTML += `
+                    <div class="step completed">
+                        <div class="step-icon">✅</div>
+                        <div class="step-content">
+                            <div class="step-label">Tool result: ${escapeHtml(data.tool)}</div>
+                            ${data.result ? `<div class="step-detail">${escapeHtml(data.result)}</div>` : ''}
+                        </div>
+                    </div>`;
+            }
+            scrollDown();
+        }
+
+        // --- Send message ---
+        async function sendMessage() {
+            const text = messageInput.value.trim();
+            if (!text || isStreaming) return;
+
+            isStreaming = true;
+            sendBtn.disabled = true;
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+            stepsDiv = null;
+
+            addMessage('user', escapeHtml(text));
+
+            try {
+                const resp = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text, session_id: sessionId }),
+                });
+
+                const reader = resp.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+
+                    for (const line of lines) {
+                        if (!line.startsWith('data: ')) continue;
+                        const payload = JSON.parse(line.slice(6));
+
+                        if (payload.type === 'session') {
+                            sessionId = payload.session_id;
+                        } else if (payload.type === 'step') {
+                            if (payload.status === 'thinking') addStep('thinking', {});
+                            else if (payload.status === 'calling') addStep('calling', payload);
+                            else if (payload.status === 'completed') addStep('completed', payload);
+                        } else if (payload.type === 'answer') {
+                            // Remove thinking step if still present
+                            const ts = document.getElementById('thinkingStep');
+                            if (ts) ts.remove();
+                            addMessage('agent', formatMarkdown(payload.text));
+                        } else if (payload.type === 'error') {
+                            addMessage('agent', `<span style="color:#ef4444">Error: ${escapeHtml(payload.text)}</span>`);
+                        }
+                    }
+                }
+            } catch (err) {
+                addMessage('agent', `<span style="color:#ef4444">Connection error: ${escapeHtml(err.message)}</span>`);
+            }
+
+            isStreaming = false;
+            sendBtn.disabled = false;
+            messageInput.focus();
+        }
+
+        // --- Reset conversation ---
+        async function resetChat() {
+            await fetch('/reset', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sessionId }),
+            });
+            sessionId = crypto.randomUUID();
+            chatContainer.innerHTML = `
+                <div class="welcome" id="welcome">
+                    <h2>👋 How can I help?</h2>
+                    <p>I'm your AI service desk agent. I can diagnose system issues by running PowerShell commands on your machine.</p>
+                    <div class="suggestions">
+                        <div class="suggestion" onclick="sendSuggestion(this)">Check my CPU usage</div>
+                        <div class="suggestion" onclick="sendSuggestion(this)">Why is my laptop slow?</div>
+                        <div class="suggestion" onclick="sendSuggestion(this)">Show disk space</div>
+                        <div class="suggestion" onclick="sendSuggestion(this)">List recent errors</div>
+                    </div>
+                </div>`;
+            stepsDiv = null;
+        }
+
+        // --- Utilities ---
+        function scrollDown() {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function escapeHtml(str) {
+            const d = document.createElement('div');
+            d.textContent = str;
+            return d.innerHTML;
+        }
+
+        function formatMarkdown(text) {
+            // Code blocks
+            text = text.replace(/```(\w*)\n([\s\S]*?)```/g,
+                (_, lang, code) => `<pre><code>${escapeHtml(code.trim())}</code></pre>`);
+            // Inline code
+            text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+            // Bold
+            text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            // Line breaks
+            text = text.replace(/\n/g, '<br>');
+            return text;
+        }
+
+        // Focus input on load
+        messageInput.focus();
+    </script>
+</body>
+</html>
